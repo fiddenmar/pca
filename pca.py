@@ -14,7 +14,6 @@ def pca_load_config(pca_config_filepath):
 	if not os.path.isfile(pca_config_filepath):
 		print "Error: config file does not exist"
 		sys.exit(2)
-	
 	pca_config_file = open(pca_config_filepath, 'r')
 	pca_config = pca_config_file.read()
 	result = json.loads(pca_config)
@@ -103,25 +102,41 @@ def parse_rules(rules):
 
 def pca_send_log(log, pca_config):
 	if pca_config['email']['in_use'] == "yes":
-	msg = MIMEText(log)
-	msg['Subject'] = 'pca report ' + datetime.datetime.now().strftime("%I:%M%p, %B %d, %Y")
-	msg['From'] = pca_config['email']['mail_from']
-	msg['To'] = pca_config['email']['mail_to']
+		msg = MIMEText(log)
+		msg['Subject'] = 'pca report ' + datetime.datetime.now().strftime("%I:%M%p, %B %d, %Y")
+		msg['From'] = pca_config['email']['mail_from']
+		msg['To'] = pca_config['email']['mail_to']
+		s = smtplib.SMTP(pca_config['email']['host']+":"+pca_config['email']['port'])
+		s.starttls()
+		s.login(pca_config['email']['mail_from'], pca_config['email']['password_filepath'].read())
+		s.sendmail(pca_config['email']['mail_from'], pca_config['email']['mail_to'], msg)
+		s.quit()
 
-	s = smtplib.SMTP(pca_config['email']['host']+":"+pca_config['email']['port'])
-	s.starttls()
-	s.login(pca_config['email']['mail_from'], pca_config['email']['password_filepath'].read())
-	s.sendmail(pca_config['email']['mail_from'], pca_config['email']['mail_to'], msg)
-	s.quit()
+def search(ld, name):
+	for d in ld:
+	if d['filename'] == name:
+	return d
+
+def pca_update_files(filelist, pca_config, pca_config_filepath):
+	modifications = pca_config['modifications']
+	recorded_filenames = [d['filename'] for d in modifications]
+	recorded_timestamps = [d['timestamp'] for d in modifications]
+	for file in filelist:
+		if file in recorded_filenames:
+			f = search(modifications, file)
+			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(file)
+		else
+			modifications.append({'filename':file, 'timestamp:'os.path.getmtime(file)})
+	pca_config['modifications'] = modifications
+	with open(pca_config_filepath, 'w') as outfile
+		json.dump(pca_config, outfile)
 
 def print_help():
 	print "Usage: pca.py [<config>]"
 	print "\t<config>: .pca_config custom path (default is ~/.pca_config)"
 
 def main(argv):
-
 	pca_config_filepath = "~/.pca_config"
-
 	try:
 		opts, args = getopt.getopt(argv,"h",[])
 	except getopt.GetoptError:
@@ -134,14 +149,12 @@ def main(argv):
 		else:
 			print_help()
 			sys.exit(2)
-
 	if len(args) == 1:
 		pca_config_filepath = args[0]
 	pca_config = pca_load_config(pca_config_filepath)
 	pca_git(pca_config)
 	filelist = pca_check_files(pca_config)
 	result = pca_validate(filelist, pca_config)
-
 	correct = result["correct"]
 	log = result["log"]
 	if not correct:
@@ -150,7 +163,7 @@ def main(argv):
 		log_file = open(datetime.datetime.now().strftime("%I%M%p_%B%d_%Y.log"), "w")
 		text_file.write(log)
 		text_file.close()
-	pca_update_files(filelist, pca_config)
+	pca_update_files(filelist, pca_config, pca_config_filepath)
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
