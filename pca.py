@@ -1,5 +1,5 @@
 import sys
-inport os
+import os
 import getopt
 import os.path
 import json
