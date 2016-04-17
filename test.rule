@@ -1,0 +1,18 @@
+{ 
+	"sections": 
+	[ 
+		{ 
+			"device_type": "device_type", 
+			"type": "type", 
+			"trigger": "trigger", 
+			"conditions": 
+			[ 
+				{ 
+					"rule": "rule", 
+					"message": "message", 
+					"command": "command" 
+				}
+			] 
+		} 
+	] 
+}

@@ -1,0 +1,34 @@
+{ 
+	"net_config_filepath": "filepath",
+	"user_rules_filepath": "filepath",
+	"email":
+	{
+		"in_use":"yes",
+		"mail_from":"mail@from.xyz",
+		"host":"host",
+		"port":"port",
+		"password_filepath":"filepath",
+		"mail_to":
+		[
+			"mail1@to.xyz",
+			"mail2@to.xyz",
+			"mail3@to.xyz",
+			"mail4@to.xyz"
+		]
+	},
+	"git":
+	{
+		"in_use":"yes"
+	},
+	"modifications":
+	[
+		{
+			"filename":"filename1",
+			"timestamp":"1234567890"
+		},
+		{
+			"filename":"filename2",
+			"timestamp":"1234567890"
+		}
+	]
+}
