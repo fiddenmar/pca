@@ -121,12 +121,19 @@ def pca_update_files(filelist, pca_config, pca_config_filepath):
 	modifications = pca_config['modifications']
 	recorded_filenames = [d['filename'] for d in modifications]
 	recorded_timestamps = [d['timestamp'] for d in modifications]
-	for config in filelist:
-		if config in recorded_filenames:
-			f = search(modifications, config)
-			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(config)
+	for config_file in filelist:
+		if config_file in recorded_filenames:
+			f = search(modifications, config_file)
+			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(config_file)
 		else
-			modifications.append({'filename':config, 'timestamp:'os.path.getmtime(config)})
+			modifications.append({'filename':config_file, 'timestamp':os.path.getmtime(config_file)})
+	rule_files = glob.glob("user_rules_filepath"+"/*.rule")
+	for rule_file in rule_files:
+		if rule_file in recorded_filenames:
+			f = search(modifications, rule_file)
+			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(rule_file)
+		else
+			modifications.append({'filename':rule_file, 'timestamp':os.path.getmtime(rule_file)})
 	pca_config['modifications'] = modifications
 	with open(pca_config_filepath, 'w') as outfile
 		json.dump(pca_config, outfile)
