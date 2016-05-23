@@ -1,18 +1,20 @@
 import sys
 import os
+import os.path
 import getopt
 import os.path
 import json
 import subprocess
 import glob
 import smtplib
+import datetime
 from email.mime.text import MIMEText
 
 from ciscoconfparse import CiscoConfParse
 
 def pca_load_config(pca_config_filepath):
 	if not os.path.isfile(pca_config_filepath):
-		print "Error: config file does not exist"
+		print("Error: config file does not exist")
 		sys.exit(2)
 	pca_config_file = open(pca_config_filepath, 'r')
 	pca_config = pca_config_file.read()
@@ -20,49 +22,60 @@ def pca_load_config(pca_config_filepath):
 	return result
 
 def pca_git(pca_config):
-	pca_path = os.path.dirname(os.path.realpath(__file__))
+	user_rules_filepath = os.path.expanduser(pca_config['user_rules_filepath'])
+	net_config_filepath = os.path.expanduser(pca_config['net_config_filepath'])
 	if pca_config['git']['in_use'] == "yes":
-		subprocess.call(["cd", pca_config['net_config_filepath']])
-		subprocess.call(["git", "pull"])
-		subprocess.call(["cd", pca_config['user_rules_filepath']])
-		subprocess.call(["git", "pull"])
-		subprocess.call(["cd", pca_path])
+		subprocess.call(["git", "pull"], cwd=net_config_filepath)
+		subprocess.call(["git", "pull"], cwd=user_rules_filepath)
 
 def pca_check_files(pca_config):
 	filelist = []
 	recorded_files = pca_config['modifications']
+	user_rules_filepath = os.path.expanduser(pca_config['user_rules_filepath'])
+	net_config_filepath = os.path.expanduser(pca_config['net_config_filepath'])
 	recorded_filenames = [d['filename'] for d in recorded_files]
 	recorded_timestamps = [d['timestamp'] for d in recorded_files]
-	rule_files = glob.glob("user_rules_filepath"+"/*.rule")
+	rule_files = glob.glob(user_rules_filepath+"/*.rule")
 	for rule_file in rule_files:
 		if rule_file in recorded_filenames:
 			target_index = recorded_filenames.index(rule_file)
 			target_timestamp = recorded_timestamps[target_index]
-			if int(target_timestamp) != os.path.getmtime(rule_file):
-				filelist = glob.glob("net_config_filepath" + "/*.config")
+			if int(target_timestamp) != int(os.path.getmtime(rule_file)):
+				filelist = glob.glob(net_config_filepath + "/*.config")
 	if filelist == []:
-		config_files = glob.glob("net_config_filepath" + "/*.config")
+		filelist = glob.glob(net_config_filepath + "/*.config")
+		config_files = glob.glob(net_config_filepath + "/*.config")
 		for config_file in config_files:
 			if config_file in recorded_filenames:
 				target_index = recorded_filenames.index(config_file)
 				target_timestamp = recorded_timestamps[target_index]
-				if int(target_timestamp) == os.path.getmtime(config_file):
+				if int(target_timestamp) == int(os.path.getmtime(config_file)):
 					filelist.pop(filelist.index(config_file))
 	return filelist
 
 def pca_validate(filelist, pca_config):
 	result = {"correct": True, "log":""}
-	rule_files = glob.glob("user_rules_filepath"+"/*.rule")
+	filelist_incorrect = []
+	user_rules_filepath = os.path.expanduser(pca_config['user_rules_filepath'])
+	rule_files = glob.glob(user_rules_filepath+"/*.rule")
 	for rule_file in rule_files:
 		for config_file in filelist:
 			rules = parse_rules(rule_file)
 			config = parse_config(config_file)
-			res = pca_calidate_process(rules, config)
-			result = {result['correct'] & res['correct'], result['log'] + config_file + "\n" + res['log']}
+			res = pca_validate_process(rules, config)
+			correct = result['correct'] & res['correct']
+			log = result['log']
+			if not res['correct']:
+				filelist_incorrect.append(config_file)
+				log += config_file + "\n" + res['log']
+			result = {"correct": correct, "log": log}
+	for file_incorrect in filelist_incorrect:
+		filelist.pop(filelist.index(file_incorrect))
 	return result
 	
 def pca_validate_process(rules, config):
 	correct = True
+	log = ""
 	sections = rules['sections']
 	for section in sections:
 		section_type = section['type']
@@ -79,12 +92,11 @@ def pca_validate_process(rules, config):
 			for config_section in config_sections:
 				res = config.find_children_w_parents(config_section, valid_rule)
 				if res == []:
-					log += "\tdevice_type: ", device_type + "\n"
-					log += "\tsection_type: ", section_type + "\n"
-					log += "\ttrigger: ", trigger + "\n"
-					log += "\tconfig_section: ", config.find_all_children(config_section) + "\n"
-					log += "\tvalid_rule: ", valid_rule + "\n"
-					log += "\tres: ", res + "\n"
+					log += "\tdevice_type: " + device_type + "\n"
+					log += "\tsection_type: " + section_type + "\n"
+					log += "\ttrigger: " + trigger + "\n"
+					log += "\tconfig_section: " + '\n\t'.join(config.find_all_children(config_section)) + "\n"
+					log += "\tvalid_rule: " + valid_rule + "\n"
 					log += valid_message + "\n" + "\n"
 					#do valid_command
 					correct = False
@@ -114,10 +126,13 @@ def pca_send_log(log, pca_config):
 
 def search(ld, name):
 	for d in ld:
-	if d['filename'] == name:
-	return d
+		if d['filename'] == name:
+			return d
+	return None
 
 def pca_update_files(filelist, pca_config, pca_config_filepath):
+	user_rules_filepath = os.path.expanduser(pca_config['user_rules_filepath'])
+	net_config_filepath = os.path.expanduser(pca_config['net_config_filepath'])
 	modifications = pca_config['modifications']
 	recorded_filenames = [d['filename'] for d in modifications]
 	recorded_timestamps = [d['timestamp'] for d in modifications]
@@ -125,25 +140,25 @@ def pca_update_files(filelist, pca_config, pca_config_filepath):
 		if config_file in recorded_filenames:
 			f = search(modifications, config_file)
 			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(config_file)
-		else
+		else:
 			modifications.append({'filename':config_file, 'timestamp':os.path.getmtime(config_file)})
-	rule_files = glob.glob("user_rules_filepath"+"/*.rule")
+	rule_files = glob.glob(user_rules_filepath+"/*.rule")
 	for rule_file in rule_files:
 		if rule_file in recorded_filenames:
 			f = search(modifications, rule_file)
 			modifications[modifications.index(f)]['timestamp'] = os.path.getmtime(rule_file)
-		else
+		else:
 			modifications.append({'filename':rule_file, 'timestamp':os.path.getmtime(rule_file)})
 	pca_config['modifications'] = modifications
-	with open(pca_config_filepath, 'w') as outfile
-		json.dump(pca_config, outfile)
+	outfile = open(pca_config_filepath, 'w')
+	json.dump(pca_config, outfile)
 
 def print_help():
-	print "Usage: pca.py [<config>]"
-	print "\t<config>: .pca_config custom path (default is ~/.pca_config)"
+	print("Usage: pca.py [<config>]")
+	print("\t<config>: .pca_config custom path (default is ~/.pca_config)")
 
 def main(argv):
-	pca_config_filepath = "~/.pca_config"
+	pca_config_filepath = os.path.expanduser("~/.pca_config")
 	try:
 		opts, args = getopt.getopt(argv,"h",[])
 	except getopt.GetoptError:
@@ -165,11 +180,10 @@ def main(argv):
 	correct = result["correct"]
 	log = result["log"]
 	if not correct:
-		print "Configuration file is not correct"
 		pca_send_log(log, pca_config)
 		log_file = open(datetime.datetime.now().strftime("%I%M%p_%B%d_%Y.log"), "w")
-		text_file.write(log)
-		text_file.close()
+		log_file.write(log)
+		log_file.close()
 	pca_update_files(filelist, pca_config, pca_config_filepath)
 
 if __name__ == "__main__":

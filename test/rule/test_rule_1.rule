@@ -1,0 +1,18 @@
+{ 
+	"sections": 
+	[ 
+		{ 
+			"device_type": "mes", 
+			"type": "interface", 
+			"trigger": "switchport trunk native vlan 1002", 
+			"conditions": 
+			[ 
+				{ 
+					"rule": "switchport trunk allowed vlan add 1000,1001", 
+					"message": "ERROR: switchport trunk allowed vlan add 1000,1001 EXPECTED", 
+					"command": "command" 
+				}
+			] 
+		} 
+	] 
+}
