@@ -61,7 +61,7 @@ def pca_validate(filelist, pca_config):
 			result = {result['correct'] & res['correct'], result['log'] + config_file + "\n" + res['log']}
 	return result
 	
-def pca_calidate_precess(rules, config):
+def pca_validate_process(rules, config):
 	correct = True
 	sections = rules['sections']
 	for section in sections:
