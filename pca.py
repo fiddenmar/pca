@@ -167,6 +167,14 @@ def parse_rules(rules):
 	result = json.loads(rules)
 	return result
 
+def get_password(password_filepath):
+	if not os.path.isfile(password_filepath):
+		print("Error: rule file does not exist")
+		sys.exit(2)
+	password_file = open(rules, 'r')
+	password = password_file.read()
+	return password
+
 def pca_send_log(log, pca_config):
 	global PCA_VERBOSE
 	global PCA_DEBUG
@@ -181,7 +189,8 @@ def pca_send_log(log, pca_config):
 		msg['To'] = pca_config['email']['mail_to']
 		s = smtplib.SMTP(pca_config['email']['host']+":"+pca_config['email']['port'])
 		s.starttls()
-		s.login(pca_config['email']['mail_from'], pca_config['email']['password_filepath'].read())
+		password = get_password(pca_config['email']['password_filepath'])
+		s.login(pca_config['email']['mail_from'], password)
 		s.sendmail(pca_config['email']['mail_from'], pca_config['email']['mail_to'], msg)
 		s.quit()
 
